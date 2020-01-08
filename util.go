@@ -21,16 +21,15 @@ func bruteforceDecrypt(cph *network.CryptPacketHeader, data []byte) ([]byte, err
 	return nil, errors.New("Couldn't decrypt packet")
 }
 
+// Helper function to make a spaced hex string.
 func makeSpacedHex(data []byte) string {
 	s := hex.EncodeToString(data)
-	n := 2
 
 	var buffer bytes.Buffer
-	var n1 = n - 1
-	var l1 = len(s) - 1
+	var strEnd = len(s) - 1
 	for i, rune := range s {
 		buffer.WriteRune(rune)
-		if i%n == n1 && i != l1 {
+		if i%2 == 1 && i != strEnd {
 			buffer.WriteRune(' ')
 		}
 	}

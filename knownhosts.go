@@ -1,10 +1,43 @@
 package main
 
+const (
+	// BPF to filter our pcaps by.
+	constBPFFilter = "(net 106.185.0.0/16) || (net 27.105.81.0/24)"
+)
+
+// isChannelServer checks if the port is a known channel server port.
+func isChannelServer(port uint16) bool {
+	return ((port >= 53410 && port <= 53420) || // TW channel server ports
+		(port >= 54000 && port <= 54020)) // JP channel server ports
+}
+
+// isEntranceServer checks if the port is a known entrance server port.
+func isEntranceServer(port uint16) bool {
+	return port == 53310
+}
+
+// isSignServer checks if the port is a known sign server port.
+func isSignServer(port uint16) bool {
+	return port == 53312
+}
+
+// isNullInitedServer checks if the port is a known 8*null initialized server port.
+func isNullInitedServer(port uint16) bool {
+	return isEntranceServer(port) || isSignServer(port)
+}
+
+// isMhfServer checks if the port is a known MHF server port (entrance, sign, or channel server).
+func isMhfServer(port uint16) bool {
+	return isEntranceServer(port) || isSignServer(port) || isChannelServer(port)
+}
+
 var (
 	knownHosts map[string]string
 )
 
 func init() {
+
+	// Initialize our _large_ hosts map.
 	knownHosts = make(map[string]string)
 	knownHosts["27.105.81.196:53312"] = "TW - Sign server"
 	knownHosts["27.105.81.196:53310"] = "TW - Entrance server"
