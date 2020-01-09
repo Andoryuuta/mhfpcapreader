@@ -41,8 +41,10 @@ func init() {
 	knownHosts = make(map[string]string)
 	knownHosts["27.105.81.196:53312"] = "TW - Sign server"
 	knownHosts["27.105.81.196:53310"] = "TW - Entrance server"
+	knownHosts["27.105.81.197:53310"] = "TW - Entrance server (2?)"
 	knownHosts["106.185.74.52:53312"] = "JP - Sign server"
 	knownHosts["106.185.74.61:53310"] = "JP - Entrance server"
+	
 
 	knownHosts["106.185.75.29:54001"] = "JP - |Aビギニング HR4まで推奨| - channel 0"
 	knownHosts["106.185.75.29:54002"] = "JP - |Aビギニング HR4まで推奨| - channel 1"
