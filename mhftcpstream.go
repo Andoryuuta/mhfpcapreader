@@ -79,7 +79,7 @@ func (t *mhfTCPStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.
 			}
 
 			// Try to read in the payload
-			if len(data) >= 14+int(cph.DataSize) {
+			if len(data[do:]) >= 14+int(cph.DataSize) {
 				payload := data[do+14 : do+14+int(cph.DataSize)]
 
 				fmt.Printf("Read full MHF packet, size: %d\n", cph.DataSize)
