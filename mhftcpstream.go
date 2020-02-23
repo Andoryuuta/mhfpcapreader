@@ -16,10 +16,10 @@ import (
 
 // mhfTCPStream represents a single (bidirectional) TCP stream.
 type mhfTCPStream struct {
-	net, transport     gopacket.Flow
-	isMhfServer        bool
-	isNullInitedServer bool
-	nullInitComplete   bool
+	net, transport   gopacket.Flow
+	isMhfConn        bool
+	isNullInitedConn bool
+	nullInitComplete bool
 	sync.Mutex
 }
 
@@ -43,7 +43,7 @@ func (t *mhfTCPStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.
 	}
 
 	data := sg.Fetch(length)
-	if t.isMhfServer {
+	if t.isMhfConn {
 		// Loop and try to parse as many packets from the currently available data as possible.
 		do := 0
 		for {
@@ -107,32 +107,50 @@ func (t *mhfTCPStream) handleFullMhfPacket(cph *network.CryptPacketHeader, paylo
 	ac.(*Context).LogFileLock.Lock()
 	defer ac.(*Context).LogFileLock.Unlock()
 
-	// Make some indention, host, and send/recv strings based on the packet direction.
+	// Make some indention, and send/recv strings based on the packet direction.
 	var ident string
-	var hostString string
+	var gameServerString string // The gameserver IP:PORT (regardless of direction)
 	var dirString string
-	if dir == reassembly.TCPDirClientToServer {
+
+	isSend := (dir == reassembly.TCPDirClientToServer)
+	dstString := fmt.Sprintf("%v:%v", t.net.Dst().String(), t.transport.Dst().String())
+	srcString := fmt.Sprintf("%v:%v", t.net.Reverse().Dst().String(), t.transport.Reverse().Dst().String())
+	if _, ok := knownHosts[srcString]; ok {
+		// The stream source is the game server.
+		gameServerString = srcString
+
+		// Invert the flow direction.
+		isSend = !isSend
+
+	} else {
+		gameServerString = dstString
+	}
+
+	if isSend {
 		ident = fmt.Sprintf("%v %v(%s): ", t.net, t.transport, dir)
-		hostString = fmt.Sprintf("%v:%v", t.net.Dst().String(), t.transport.Dst().String())
 		dirString = "Send"
 	} else {
 		ident = fmt.Sprintf("%v %v(%s): ", t.net.Reverse(), t.transport.Reverse(), dir)
-		hostString = fmt.Sprintf("%v:%v", t.net.Dst().String(), t.transport.Dst().String())
 		dirString = "Recv"
 	}
+
+	var hostCommentString string
+	host, ok := knownHosts[gameServerString]
+	if ok {
+		hostCommentString = fmt.Sprintf("//%s %s", ident, host)
+	} else {
+		hostCommentString = fmt.Sprintf("//%s Unknown host %s\n", ident, gameServerString)
+	}
+
+	// Now begin actually writing the packets to the file.
 
 	fmt.Fprintln(outFile, "")
 
 	// Print header
-	fmt.Fprintf(outFile, "//%+v\n", cph)
+	//fmt.Fprintf(outFile, "//%+v\n", cph)
 
 	// Print host
-	host, ok := knownHosts[hostString]
-	if ok {
-		fmt.Fprintf(outFile, "//%s %s\n", ident, host)
-	} else {
-		fmt.Fprintf(outFile, "//%s Unknown host %s\n", ident, hostString)
-	}
+	fmt.Fprintln(outFile, hostCommentString)
 
 	// Print time and direction(send/recv)
 	fmt.Fprintln(outFile, ac.GetCaptureInfo().Timestamp)
@@ -148,7 +166,7 @@ func (t *mhfTCPStream) handleFullMhfPacket(cph *network.CryptPacketHeader, paylo
 	}
 
 	// Check if the server uses opcodes and print accordingly.
-	if t.isNullInitedServer {
+	if t.isNullInitedConn {
 		fmt.Fprintln(outFile, "PARSER_ERROR_SERVER_DOESNT_USE_OPCODES") // Fake pseudo-opcode for servers that don't have an opcode.
 	} else {
 		fmt.Fprintln(outFile, network.PacketID(binary.BigEndian.Uint16(dec[:2])).String())
@@ -168,10 +186,10 @@ type mhfTCPStreamFactory struct{}
 
 func (f *mhfTCPStreamFactory) New(net, transport gopacket.Flow, tcp *layers.TCP, ac reassembly.AssemblerContext) reassembly.Stream {
 	stream := &mhfTCPStream{
-		net:                net,
-		transport:          transport,
-		isMhfServer:        isMhfServer(uint16(tcp.SrcPort)) || isMhfServer(uint16(tcp.DstPort)),
-		isNullInitedServer: isNullInitedServer(uint16(tcp.SrcPort)) || isNullInitedServer(uint16(tcp.DstPort)),
+		net:              net,
+		transport:        transport,
+		isMhfConn:        isMhfServer(uint16(tcp.SrcPort)) || isMhfServer(uint16(tcp.DstPort)),
+		isNullInitedConn: isNullInitedServer(uint16(tcp.SrcPort)) || isNullInitedServer(uint16(tcp.DstPort)),
 	}
 
 	return stream
