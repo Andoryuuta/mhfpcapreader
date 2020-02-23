@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
+	"runtime/debug"
 
 	"github.com/google/gopacket"
 
@@ -17,6 +19,8 @@ import (
 func main() {
 	var filename = flag.String("i", "", "Input pcap filename")
 	var outFilename = flag.String("o", "", "Output log name")
+	var inputDir = flag.String("idir", "", "Input directory (bulk parsing)")
+	var outputDir = flag.String("odir", "output", "Output directory (bulk parsing)")
 	flag.Parse()
 
 	// Parse the pcap if a single -i input was provided.
@@ -29,32 +33,78 @@ func main() {
 
 		doParsePcap(*filename, outName)
 	}
+
+	// Whole directory parsing.
+	if *inputDir != "" {
+		var filepaths []string
+		err := filepath.Walk(*inputDir, func(path string, info os.FileInfo, err error) error {
+			if info.IsDir() {
+				return nil
+			}
+
+			ext := filepath.Ext(path)
+			if ext == ".pcap" || ext == ".pcapng" {
+				filepaths = append(filepaths, path)
+			}
+
+			return nil
+		})
+		if err != nil {
+			panic(err)
+		}
+
+		os.MkdirAll(*outputDir, os.ModePerm)
+		for _, fp := range filepaths {
+			fmt.Println("Now parsing:", fp)
+
+			// Create an output name based on the input name.
+			outName := fmt.Sprintf("%s_LOG.txt", filepath.Base(fp))
+
+			wrapDoParsePcap(fp, filepath.Join(*outputDir, outName))
+		}
+	}
 }
 
-func doParsePcap(pcapFilename string, outName string) {
+// There some places in gopacket/reassembly that occasionally cause unhandled panics,
+// this function wraps the doParsePcap call in a recover statement and ignores errors for bulk parsing.
+func wrapDoParsePcap(pcapFilename string, outName string) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))
+		}
+	}()
+
+	err := doParsePcap(pcapFilename, outName)
+	if err != nil {
+		fmt.Printf("Got error: %v\n", err)
+	}
+}
+
+func doParsePcap(pcapFilename string, outName string) error {
 	// Create the output log file.
 	outFile, err := os.Create(outName)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer outFile.Close()
 
 	// Open the pcap.
 	handle, err := pcap.OpenOffline(pcapFilename)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	defer handle.Close()
 
 	// Filter the pcap by our hosts filter.
 	err = handle.SetBPFFilter(constBPFFilter)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	// Get the TCP decoder.
 	dec, ok := gopacket.DecodersByLayerName[fmt.Sprintf("%s", handle.LinkType())]
 	if !ok {
-		panic("Error getting decoder")
+		return err
 	}
 
 	// Create a new source from our pcap handle and our TCP decoder.
@@ -100,7 +150,8 @@ func doParsePcap(pcapFilename string, outName string) {
 
 			err := tcp.SetNetworkLayerForChecksum(packet.NetworkLayer())
 			if err != nil {
-				log.Fatalf("Failed to set network layer for checksum: %s\n", err)
+				//log.Fatalf("Failed to set network layer for checksum: %s\n", err)
+				return err
 			}
 
 			c := Context{
@@ -114,4 +165,6 @@ func doParsePcap(pcapFilename string, outName string) {
 
 	// Flush any data in the assembler that was waiting for more packets/data.
 	assembler.FlushAll()
+
+	return nil
 }
