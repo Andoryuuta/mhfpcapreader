@@ -59,8 +59,9 @@ func main() {
 
 			// Create an output name based on the input name.
 			outName := fmt.Sprintf("%s_LOG.txt", filepath.Base(fp))
-
 			wrapDoParsePcap(fp, filepath.Join(*outputDir, outName))
+
+			fmt.Println("Finished parsing:", fp)
 		}
 	}
 }

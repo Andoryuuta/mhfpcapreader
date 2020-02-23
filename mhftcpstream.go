@@ -2,16 +2,19 @@ package main
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/reassembly"
 
 	"github.com/Andoryuuta/Erupe/network"
+	"github.com/Andoryuuta/Erupe/network/mhfpacket"
+	"github.com/Andoryuuta/byteframe"
 )
 
 // mhfTCPStream represents a single (bidirectional) TCP stream.
@@ -38,7 +41,7 @@ func (t *mhfTCPStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.
 		// this is allowed
 	} else if skip != 0 {
 		// Missing bytes in stream: do not even try to parse it
-		fmt.Printf("Skip: %v\n", skip)
+		//fmt.Printf("Skip: %v\n", skip)
 		return
 	}
 
@@ -58,7 +61,7 @@ func (t *mhfTCPStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.
 			// Check if we have the 8*null init followed by a start of packet (0x03).
 			if !t.nullInitComplete {
 				if bytes.Equal(data[do:do+9], []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03}) {
-					fmt.Println("Got 8*NULL init.")
+					//fmt.Println("Got 8*NULL init.")
 					t.nullInitComplete = true
 					sg.KeepFrom(do + 8)
 					return
@@ -82,7 +85,7 @@ func (t *mhfTCPStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.
 			if len(data[do:]) >= 14+int(cph.DataSize) {
 				payload := data[do+14 : do+14+int(cph.DataSize)]
 
-				fmt.Printf("Read full MHF packet, size: %d\n", cph.DataSize)
+				//fmt.Printf("Read full MHF packet, size: %d\n", cph.DataSize)
 				t.handleFullMhfPacket(cph, payload, sg, ac)
 
 				do += 14 + int(cph.DataSize)
@@ -137,28 +140,52 @@ func (t *mhfTCPStream) handleFullMhfPacket(cph *network.CryptPacketHeader, paylo
 	var hostCommentString string
 	host, ok := knownHosts[gameServerString]
 	if ok {
-		hostCommentString = fmt.Sprintf("//%s %s", ident, host)
+		hostCommentString = fmt.Sprintf("// %s %s", ident, host)
 	} else {
-		hostCommentString = fmt.Sprintf("//%s Unknown host %s\n", ident, gameServerString)
+		hostCommentString = fmt.Sprintf("// %s Unknown host %s\n", ident, gameServerString)
 	}
 
 	// Now begin actually writing the packets to the file.
+	/*
+		fmt.Fprintln(outFile, "")
 
-	fmt.Fprintln(outFile, "")
+		// Print header
+		//fmt.Fprintf(outFile, "//%+v\n", cph)
 
-	// Print header
-	//fmt.Fprintf(outFile, "//%+v\n", cph)
+		// Print host
+		fmt.Fprintln(outFile, hostCommentString)
 
-	// Print host
-	fmt.Fprintln(outFile, hostCommentString)
+		// Print time and direction(send/recv)
+		fmt.Fprintln(outFile, ac.GetCaptureInfo().Timestamp)
+		fmt.Fprintln(outFile, dirString)
 
-	// Print time and direction(send/recv)
-	fmt.Fprintln(outFile, ac.GetCaptureInfo().Timestamp)
-	fmt.Fprintln(outFile, dirString)
+		// Decrypt the packet.
+		dec, err := bruteforceDecrypt(cph, payload)
+		if err != nil {
+			fmt.Fprintln(outFile, "PARSER_ERROR_FAILED_TO_DECRYPT") // Fake pseudo-opcode for failing to decrypt
+			fmt.Fprintln(outFile, "")                               // Blank line where the hex would usually be.
+			fmt.Println(err)
+			return
+		}
+
+		// Check if the server uses opcodes and print accordingly.
+		if t.isNullInitedConn {
+			fmt.Fprintln(outFile, "PARSER_ERROR_SERVER_DOESNT_USE_OPCODES") // Fake pseudo-opcode for servers that don't have an opcode.
+		} else {
+			fmt.Fprintln(outFile, network.PacketID(binary.BigEndian.Uint16(dec[:2])).String())
+		}
+
+		// Print the spaced hex of the decrypted output.
+		fmt.Fprintln(outFile, makeSpacedHex(dec))
+	*/
 
 	// Decrypt the packet.
 	dec, err := bruteforceDecrypt(cph, payload)
 	if err != nil {
+		fmt.Fprintln(outFile, "")
+		fmt.Fprintln(outFile, hostCommentString)
+		fmt.Fprintln(outFile, ac.GetCaptureInfo().Timestamp)
+		fmt.Fprintln(outFile, dirString)
 		fmt.Fprintln(outFile, "PARSER_ERROR_FAILED_TO_DECRYPT") // Fake pseudo-opcode for failing to decrypt
 		fmt.Fprintln(outFile, "")                               // Blank line where the hex would usually be.
 		fmt.Println(err)
@@ -167,13 +194,96 @@ func (t *mhfTCPStream) handleFullMhfPacket(cph *network.CryptPacketHeader, paylo
 
 	// Check if the server uses opcodes and print accordingly.
 	if t.isNullInitedConn {
+		fmt.Fprintln(outFile, "")
+		fmt.Fprintln(outFile, hostCommentString)
+		fmt.Fprintln(outFile, ac.GetCaptureInfo().Timestamp)
+		fmt.Fprintln(outFile, dirString)
 		fmt.Fprintln(outFile, "PARSER_ERROR_SERVER_DOESNT_USE_OPCODES") // Fake pseudo-opcode for servers that don't have an opcode.
-	} else {
-		fmt.Fprintln(outFile, network.PacketID(binary.BigEndian.Uint16(dec[:2])).String())
+		fmt.Fprintln(outFile, makeSpacedHex(dec))
+		return
 	}
 
-	// Print the spaced hex of the decrypted output.
-	fmt.Fprintln(outFile, makeSpacedHex(dec))
+	// If we got here, we are a regular MHF packet group, handle that recursively.
+	t.handleMHFPacketGroup(dec, outFile, hostCommentString, ac.GetCaptureInfo().Timestamp, dirString)
+
+}
+
+func (t *mhfTCPStream) handleMHFPacketGroup(pktGroup []byte, outFile *os.File, hostCommentString string, timestamp time.Time, dirString string) {
+	bf := byteframe.NewByteFrameFromBytes(pktGroup)
+	opcode := network.PacketID(bf.ReadUint16())
+
+	// Don't print MSG_SYS_EXTEND_THRESHOLD or MSG_SYS_END packets to the log.
+	shouldPrint := (opcode != network.MSG_SYS_EXTEND_THRESHOLD && opcode != network.MSG_SYS_END)
+
+	// Get the packet parser.
+	mhfPkt := mhfpacket.FromOpcode(opcode)
+	if mhfPkt == nil || opcode == network.MSG_SYS_ACK {
+		// Got opcode which we don't know how to parse, just print the remaining data and return.
+		if shouldPrint {
+			fmt.Fprintln(outFile, "")
+			fmt.Fprintln(outFile, hostCommentString)
+			fmt.Fprintln(outFile, "// No parser available for opcode, remaining data may be more than a single packet.")
+			fmt.Fprintln(outFile, timestamp)
+			fmt.Fprintln(outFile, dirString)
+			fmt.Fprintln(outFile, opcode.String())
+			fmt.Fprintln(outFile, makeSpacedHex(pktGroup))
+		}
+		return
+	}
+
+	// Save the read offset, parse the packet, then get the read offset.
+	preOffset, _ := bf.Seek(0, io.SeekCurrent)
+
+	// HACK(Andoryuuta): This is _REALLY BAD_ and shouldn't be needed...
+	// My auto-generated parser stubs in mhfpacket panic instead of returning an error for a missing impl.
+	// This should have been as simple as `err := mhfPkt.Parse(bf)`
+	panicked := false
+	func(mhfPkt mhfpacket.MHFPacket, bf *byteframe.ByteFrame, panicked *bool) {
+		defer func(panicked *bool) {
+			if r := recover(); r != nil {
+				*panicked = true
+				return
+			}
+		}(panicked)
+		mhfPkt.Parse(bf)
+	}(mhfPkt, bf, &panicked)
+
+	// Get the post-parse byteframe read offset.
+	postOffset, _ := bf.Seek(0, io.SeekCurrent)
+
+	// Check if we got opcode a parser panic and just print the remaining data and return.
+	if panicked {
+		if shouldPrint {
+			fmt.Fprintln(outFile, "")
+			fmt.Fprintln(outFile, hostCommentString)
+			fmt.Fprintln(outFile, "// No parser available for opcode, remaining data may be more than a single packet.")
+			fmt.Fprintln(outFile, timestamp)
+			fmt.Fprintln(outFile, dirString)
+			fmt.Fprintln(outFile, opcode.String())
+			fmt.Fprintln(outFile, makeSpacedHex(pktGroup))
+		}
+		return
+	}
+
+	// Get the exact packet bytes to print (to avoid printing data of subsequent packets.)
+	exactData := pktGroup[:uint(postOffset-preOffset)+2] // +2 because of the uint16 opcode.
+
+	// Output the final textual data.
+	if shouldPrint {
+		fmt.Fprintln(outFile, "")
+		fmt.Fprintln(outFile, hostCommentString)
+		//fmt.Fprintf(outFile, "// %+v\n", mhfPkt) // Print parsed data
+		fmt.Fprintln(outFile, timestamp)
+		fmt.Fprintln(outFile, dirString)
+		fmt.Fprintln(outFile, opcode.String())
+		fmt.Fprintln(outFile, makeSpacedHex(exactData))
+	}
+
+	// If there is more data on the stream that the .Parse method didn't read, then read another packet off it.
+	remainingData := bf.DataFromCurrent()
+	if len(remainingData) >= 2 {
+		t.handleMHFPacketGroup(remainingData, outFile, hostCommentString, timestamp, dirString)
+	}
 }
 
 func (t *mhfTCPStream) ReassemblyComplete(ac reassembly.AssemblerContext) bool {
