@@ -3,6 +3,8 @@ github.com/Andoryuuta/Erupe v0.0.0-20200101155300-0922ff4f9ca6 h1:BdmLLLtmfItCxL
 github.com/Andoryuuta/Erupe v0.0.0-20200101155300-0922ff4f9ca6/go.mod h1:4phpvs8XCZcZm4XGAjNB65Z4AZiomKb7l/M0wUiTiwM=
 github.com/Andoryuuta/Erupe v0.0.0-20200223161632-112dc03acc50 h1:ZbXvrvprzrg+B0V9yXvvnK9rdGw8kgD6XIQaCBZBepE=
 github.com/Andoryuuta/Erupe v0.0.0-20200223161632-112dc03acc50/go.mod h1:1u0nHoCh9kOU9D0AtTTv7qTKelu65FkPRFdcEauKVys=
+github.com/Andoryuuta/Erupe v0.0.0-20200224021535-1d49e279e395 h1:FPPgT2hz28GsavuIF+GOx75T+4CExabKpCNbPJ+Ux04=
+github.com/Andoryuuta/Erupe v0.0.0-20200224021535-1d49e279e395/go.mod h1:1u0nHoCh9kOU9D0AtTTv7qTKelu65FkPRFdcEauKVys=
 github.com/Andoryuuta/byteframe v0.0.0-20191219124302-41f4085eb4c0 h1:2pVgen9rh18IxSWxOa80bObcpyfrS6d5bJtZeCUN7rY=
 github.com/Andoryuuta/byteframe v0.0.0-20191219124302-41f4085eb4c0/go.mod h1:koVyx+gN3TfE70rpOidywETVODk87304YpwW69Y27J4=
 github.com/Andoryuuta/byteframe v0.0.0-20200114030334-8979c5cc4c4a h1:41dzqxDfdVhYjpkr8lxwrBdJe0RE/AXsGV1AGpP6wig=
