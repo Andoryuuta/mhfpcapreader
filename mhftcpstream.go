@@ -15,6 +15,10 @@ import (
 	"github.com/Andoryuuta/Erupe/network"
 	"github.com/Andoryuuta/Erupe/network/mhfpacket"
 	"github.com/Andoryuuta/byteframe"
+
+	"github.com/Andoryuuta/Erupe/common/stringsupport"
+	"github.com/Andoryuuta/Erupe/network/clientctx"
+	"golang.org/x/text/encoding/japanese"
 )
 
 // mhfTCPStream represents a single (bidirectional) TCP stream.
@@ -245,7 +249,11 @@ func (t *mhfTCPStream) handleMHFPacketGroup(pktGroup []byte, outFile *os.File, h
 				return
 			}
 		}(panicked)
-		mhfPkt.Parse(bf)
+		mhfPkt.Parse(bf, &clientctx.ClientContext{
+			StrConv: &stringsupport.StringConverter{
+				Encoding: japanese.ShiftJIS,
+			},
+		})
 	}(mhfPkt, bf, &panicked)
 
 	// Get the post-parse byteframe read offset.
