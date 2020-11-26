@@ -28,6 +28,10 @@ github.com/Andoryuuta/Erupe v0.0.0-20200224021535-1d49e279e395 h1:FPPgT2hz28Gsav
 github.com/Andoryuuta/Erupe v0.0.0-20200224021535-1d49e279e395/go.mod h1:1u0nHoCh9kOU9D0AtTTv7qTKelu65FkPRFdcEauKVys=
 github.com/Andoryuuta/Erupe v0.0.0-20201107175458-79f48e27c384 h1:iS56lvAWbKaEnQTZhMR3CKRQyPT4dmW6690B/PaX9lU=
 github.com/Andoryuuta/Erupe v0.0.0-20201107175458-79f48e27c384/go.mod h1:qiUqMKorZzkQpNzX7yB8TnZUYG/Fu2zoQUrCo8PpFpM=
+github.com/Andoryuuta/Erupe v0.0.0-20201125231637-48dba0862d46 h1:3oj+yvWjGR95WMPi40Gu/0pFOxThr12SuVqfFHhOfog=
+github.com/Andoryuuta/Erupe v0.0.0-20201125231637-48dba0862d46/go.mod h1:qiUqMKorZzkQpNzX7yB8TnZUYG/Fu2zoQUrCo8PpFpM=
+github.com/Andoryuuta/Erupe v0.0.0-20201126001934-96461b99a2f3 h1:PMUPKufDh1ZVeonh7Nqw2ZW4zInJ14NsiBqrSZ8f9Nw=
+github.com/Andoryuuta/Erupe v0.0.0-20201126001934-96461b99a2f3/go.mod h1:qiUqMKorZzkQpNzX7yB8TnZUYG/Fu2zoQUrCo8PpFpM=
 github.com/Andoryuuta/byteframe v0.0.0-20200114030334-8979c5cc4c4a h1:41dzqxDfdVhYjpkr8lxwrBdJe0RE/AXsGV1AGpP6wig=
 github.com/Andoryuuta/byteframe v0.0.0-20200114030334-8979c5cc4c4a/go.mod h1:koVyx+gN3TfE70rpOidywETVODk87304YpwW69Y27J4=
 github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78/go.mod h1:LmzpDX56iTiv29bbRTIsUNlaFfuhWRQBWjQdVyAevI8=

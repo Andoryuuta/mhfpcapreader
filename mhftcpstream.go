@@ -221,7 +221,7 @@ func (t *mhfTCPStream) handleMHFPacketGroup(pktGroup []byte, outFile *os.File, h
 
 	// Get the packet parser.
 	mhfPkt := mhfpacket.FromOpcode(opcode)
-	if mhfPkt == nil || opcode == network.MSG_SYS_ACK {
+	if mhfPkt == nil {
 		// Got opcode which we don't know how to parse, just print the remaining data and return.
 		if shouldPrint {
 			fmt.Fprintln(outFile, "")
@@ -238,33 +238,21 @@ func (t *mhfTCPStream) handleMHFPacketGroup(pktGroup []byte, outFile *os.File, h
 	// Save the read offset, parse the packet, then get the read offset.
 	preOffset, _ := bf.Seek(0, io.SeekCurrent)
 
-	// HACK(Andoryuuta): This is _REALLY BAD_ and shouldn't be needed...
-	// My auto-generated parser stubs in mhfpacket panic instead of returning an error for a missing impl.
-	// This should have been as simple as `err := mhfPkt.Parse(bf)`
-	panicked := false
-	func(mhfPkt mhfpacket.MHFPacket, bf *byteframe.ByteFrame, panicked *bool) {
-		defer func(panicked *bool) {
-			if r := recover(); r != nil {
-				*panicked = true
-				return
-			}
-		}(panicked)
-		mhfPkt.Parse(bf, &clientctx.ClientContext{
-			StrConv: &stringsupport.StringConverter{
-				Encoding: japanese.ShiftJIS,
-			},
-		})
-	}(mhfPkt, bf, &panicked)
+	err := mhfPkt.Parse(bf, &clientctx.ClientContext{
+		StrConv: &stringsupport.StringConverter{
+			Encoding: japanese.ShiftJIS,
+		},
+	})
 
 	// Get the post-parse byteframe read offset.
 	postOffset, _ := bf.Seek(0, io.SeekCurrent)
 
-	// Check if we got opcode a parser panic and just print the remaining data and return.
-	if panicked {
+	// Check if we got opcode a parser _error_ and just print the remaining data and return.
+	if err != nil {
 		if shouldPrint {
 			fmt.Fprintln(outFile, "")
 			fmt.Fprintln(outFile, hostCommentString)
-			fmt.Fprintln(outFile, "// No parser available for opcode, remaining data may be more than a single packet.")
+			fmt.Fprintf(outFile, "// Got parser error %s", err.Error())
 			fmt.Fprintln(outFile, timestamp)
 			fmt.Fprintln(outFile, dirString)
 			fmt.Fprintln(outFile, opcode.String())

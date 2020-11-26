@@ -3,7 +3,7 @@ module github.com/Andoryuuta/mhfpcapreader
 go 1.13
 
 require (
-	github.com/Andoryuuta/Erupe v0.0.0-20201107175458-79f48e27c384
+	github.com/Andoryuuta/Erupe v0.0.0-20201126001934-96461b99a2f3
 	github.com/Andoryuuta/byteframe v0.0.0-20200114030334-8979c5cc4c4a
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/google/gopacket v1.1.17
